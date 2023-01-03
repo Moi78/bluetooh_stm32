@@ -1,6 +1,8 @@
 #include "AutoTest.h"
 
 void TestPWM(PwmOut& pwm, std::chrono::seconds sleepTime, SerialPeriph& outp) {
+    outp.PrintStr("------ MOTOR TEST ------\n");
+
     for(float i = 0; i < 1.25; i += 0.25) {
         outp.PrintStr("PWM " + std::to_string((int)(i * 100)) + "%\n");
         pwm.write(i);
@@ -9,4 +11,5 @@ void TestPWM(PwmOut& pwm, std::chrono::seconds sleepTime, SerialPeriph& outp) {
     }
 
     pwm.write(0);
+    outp.PrintStr("DONE\n");
 }

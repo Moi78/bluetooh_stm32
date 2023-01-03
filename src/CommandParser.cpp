@@ -28,7 +28,9 @@ std::vector<std::string> CommandParser::ParseCommand(std::string cmd) {
     std::string currentWord;
     for(auto chr : cmd) {
         if(chr != ' ') {
-            currentWord += chr;
+            if(chr != '\n') {
+                currentWord += chr;
+            }
         } else {
             if(currentWord.size() > 0) {
                 args.push_back(currentWord);
