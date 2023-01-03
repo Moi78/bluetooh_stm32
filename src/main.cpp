@@ -14,7 +14,7 @@ PwmOut pLed2(PA_3);
 
 void setPwm(std::vector<std::string> args) {
     if(args.size() < 3) {
-        rn42.PrintStr("Not enough arguments\n");
+        rn42.PrintStr("ERROR: Not enough arguments\n");
         return;
     }
 
@@ -35,7 +35,7 @@ void setPwm(std::vector<std::string> args) {
 
 void autotest(std::vector<std::string> args) {
     if(args.size() < 2) {
-        rn42.PrintStr("Not enough arguments\n");
+        rn42.PrintStr("ERROR: Not enough arguments\n");
         return;
     }
 
@@ -45,7 +45,7 @@ void autotest(std::vector<std::string> args) {
         } else if(args[i] == "pwmR") {
             TestPWM(pLed2, 2s, rn42);
         } else {
-            rn42.PrintStr("Unkown test \"" + args[i] + "\"\n");
+            rn42.PrintStr("ERROR: Unkown test \"" + args[i] + "\"\n");
         }
     }
 }
@@ -88,7 +88,9 @@ int main() {
         rn42.Poll();
 
         if(rn42.GotReturn()) {
-            parser.DispatchCommand(rn42.ReadFromPort());
+            if(!parser.DispatchCommand(rn42.ReadFromPort())) {
+                rn42.PrintStr("ERROR: Unknown command.\n");
+            }
         }
     }
 }

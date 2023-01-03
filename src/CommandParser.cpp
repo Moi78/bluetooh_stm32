@@ -8,14 +8,18 @@ CommandParser::~CommandParser() {
 
 }
 
-void CommandParser::DispatchCommand(std::string cmd) {
+bool CommandParser::DispatchCommand(std::string cmd) {
     auto parsed = ParseCommand(cmd);
 
     if(parsed.size() > 0) {
         if(m_commandTable.find(parsed[0]) != m_commandTable.end()) {
             m_commandTable[parsed[0]](parsed);
+        } else {
+            return false;
         }
     }
+
+    return true;
 }
 
 void CommandParser::AddCommandCallback(CommandCallback callback, std::string command) {

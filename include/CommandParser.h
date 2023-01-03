@@ -13,7 +13,7 @@ public:
     CommandParser();
     ~CommandParser();
 
-    void DispatchCommand(std::string cmd);
+    bool DispatchCommand(std::string cmd);
 
     void AddCommandCallback(CommandCallback callback, std::string command);
 
