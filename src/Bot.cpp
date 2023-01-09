@@ -44,7 +44,7 @@ void Bot::MainRoutine() {
             break;
     }
 
-    if(m_monitor_enab && m_anti_spam > 2) {
+    if(m_monitor_enab && m_anti_spam.elapsed_time() > 2s) {
         m_anti_spam.reset();
         PrintState();
     }

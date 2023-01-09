@@ -8,7 +8,7 @@ void setPwm(std::vector<std::string> args, Bot* bot) {
 
     BotIO* bIO = bot->GetIO();
 
-    for(int i = 0; i < args.size(); i++) {
+    for(unsigned int i = 0; i < args.size(); i++) {
         if(args[i] == "-l") {
             float data = 0.0f;
             data = std::stof(args[i + 1]);
@@ -31,7 +31,7 @@ void autotest(std::vector<std::string> args, Bot* bot) {
 
     BotIO* bIO = bot->GetIO();
 
-    for(int i = 1; i < args.size(); i++) {
+    for(unsigned int i = 1; i < args.size(); i++) {
         if(args[i] == "pwmL") {
             TestPWM(bIO->L, 2s);
         } else if(args[i] == "pwmR") {
@@ -54,7 +54,7 @@ void echo(std::vector<std::string> args, Bot* bot) {
         return;
     }
 
-    for(int i = 1; i < args.size(); i++) {
+    for(unsigned int i = 1; i < args.size(); i++) {
         UART::serialOut << args[i] << " ";
     }
     UART::serialOut << UART::endl;
