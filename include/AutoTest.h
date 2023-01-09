@@ -5,8 +5,8 @@
 #include <chrono>
 #include <stdio.h>
 
-#include "SerialPeriph.h"
+#include "UARTDataOut.h"
 
-void TestPWM(PwmOut& pwm, std::chrono::seconds sleepTime, SerialPeriph& outp);
+void TestPWM(PwmOut& pwm, std::chrono::seconds sleepTime);
 
 #endif //AUTOTEST_H__

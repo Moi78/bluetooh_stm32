@@ -1,36 +1,45 @@
 #ifndef BOT_H__
 #define BOT_H__
 
+#include <mbed.h>
+#include <unordered_map>
+
+#include "UARTDataOut.h"
+
 enum main_states {
     INIT,
     RUN,
     STOP
 } typedef main_states_t;
 
-void MainRoutine(main_states_t& current, DigitalIn bp, DigitalIn jack) {
-    bool BP = !bp;
-    bool JACK = !jack;
+// Bot IO Map
+struct BotIO {
+    PwmOut L = PwmOut(PA_3);
+    PwmOut R = PwmOut(PA_4);
 
-    switch(current) {
-        case main_states_t::INIT:
-            if(!JACK) {
-                current = main_states_t::RUN;
-            }
+    DigitalIn BP = DigitalIn(A0, PullUp);
+    DigitalIn JACK = DigitalIn(A1, PullUp);
+};
 
-            break;
-        case main_states_t::RUN: 
-            if(BP) {
-                current = main_states_t::STOP;
-            }
+class Bot {
+public:
+    Bot();
+    ~Bot();
 
-            break;
+    void InitBot();
+    void MainRoutine();
 
-        case main_states_t::STOP:
-            if(JACK) {
-                current = main_states_t::INIT;
-            }
-            break;
-    }
-}
+    BotIO* GetIO();
+    main_states_t GetCurrentState();
+
+    void PrintState();
+
+    void ToggleMonitoring();
+private:
+    BotIO* m_bot_io;
+    main_states_t m_current_state;
+
+    bool m_monitor_enab;
+};
 
 #endif //BOT_H__
