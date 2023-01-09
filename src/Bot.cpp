@@ -16,6 +16,7 @@ Bot::~Bot() {
 
 void Bot::InitBot() {
     m_current_state = main_states_t::INIT;
+    m_anti_spam.start();
 }
 
 void Bot::MainRoutine() {
@@ -42,6 +43,11 @@ void Bot::MainRoutine() {
             }
             break;
     }
+
+    if(m_monitor_enab && m_anti_spam > 2) {
+        m_anti_spam.reset();
+        PrintState();
+    }
 }
 
 BotIO* Bot::GetIO() {
@@ -54,9 +60,9 @@ main_states_t Bot::GetCurrentState() {
 
 void Bot::PrintState() {
     std::unordered_map<main_states_t, std::string> stringify {
-        {main_states_t::INIT, "INIT\n"},
-        {main_states_t::RUN, "RUN\n"},
-        {main_states_t::STOP, "STOP\n"}
+        {main_states_t::INIT, "INIT"},
+        {main_states_t::RUN, "RUN"},
+        {main_states_t::STOP, "STOP"}
     };
 
     UART::serialOut << stringify[m_current_state] << UART::endl;

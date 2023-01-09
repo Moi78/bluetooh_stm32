@@ -40,6 +40,7 @@ private:
     main_states_t m_current_state;
 
     bool m_monitor_enab;
+    Timer m_anti_spam;
 };
 
 #endif //BOT_H__

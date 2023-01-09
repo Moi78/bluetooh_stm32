@@ -61,5 +61,5 @@ void echo(std::vector<std::string> args, Bot* bot) {
 }
 
 void monitor_state(std::vector<std::string> args, Bot* bot) {
-
+    bot->ToggleMonitoring();
 }
