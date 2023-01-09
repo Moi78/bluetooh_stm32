@@ -5,12 +5,24 @@
 #include "CommandParser.h"
 #include "AutoTest.h"
 #include "defs.h"
+#include "Bot.h"
 
 SerialPeriph pc(USBTX, USBRX, 9600);
 SerialPeriph rn42(D1, D0, 115000);
 
 PwmOut pLed1(PA_4);
 PwmOut pLed2(PA_3);
+
+bool monEnabled = false;
+
+main_states_t current_main_routine = main_states_t::INIT;
+
+DigitalIn BP(A0, PullUp);
+DigitalIn JACK(A1, PullUp);
+
+void btnState(std::vector<std::string> args) {
+    rn42.PrintStr(BP == 1 ? "Up\n" : "Down\n");
+}
 
 void setPwm(std::vector<std::string> args) {
     if(args.size() < 3) {
@@ -68,12 +80,34 @@ void echo(std::vector<std::string> args) {
     rn42.PrintStr("\n");
 }
 
+void print_monitor_state() {
+    std::unordered_map<main_states_t, std::string> stringify {
+        {main_states_t::INIT, "INIT\n"},
+        {main_states_t::RUN, "RUN\n"},
+        {main_states_t::STOP, "STOP\n"}
+    };
+
+    rn42.PrintStr(stringify[current_main_routine]);
+}
+
+void monitor_state(std::vector<std::string> args) {
+    monEnabled = !monEnabled;
+
+    if(monEnabled) {
+        rn42.PrintStr("Monitor enabled\n");
+    } else {
+        rn42.PrintStr("Monitor disabled\n");
+    }
+}
+
 int main() {
     CommandParser parser;
     parser.AddCommandCallback(&setPwm, "setPwm");
     parser.AddCommandCallback(&autotest, "autotest");
     parser.AddCommandCallback(&getSoftwareInfos, "getSoftwareInfos");
     parser.AddCommandCallback(&echo, "echo");
+    parser.AddCommandCallback(&btnState, "btnState");
+    parser.AddCommandCallback(&monitor_state, "monitor_state");
 
     rn42.set_flow_control(mbed::SerialBase::Flow::RTS, PA_12);
 
@@ -83,9 +117,18 @@ int main() {
     pLed2.period(1.0f / 1000.0f);
     pLed2.write(0.2f);
 
+    Timer anti_flood;
+    anti_flood.start();
     while(1) {
         pc.Poll();
         rn42.Poll();
+
+        MainRoutine(current_main_routine, BP, JACK);
+
+        if(monEnabled && anti_flood > 2) {
+            anti_flood.reset();
+            print_monitor_state();
+        }
 
         if(rn42.GotReturn()) {
             if(!parser.DispatchCommand(rn42.ReadFromPort())) {
