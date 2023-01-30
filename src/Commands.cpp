@@ -19,8 +19,36 @@ void setPwm(std::vector<std::string> args, Bot* bot) {
             data = std::stof(args[i + 1]);
 
             bIO->R.write(data / 100.0f);
+        } else if(args[i] == "-lr") {
+            float data = 0.0f;
+            data = std::stof(args[i + 1]);
+
+            bIO->R.write(data / 100.0f);
+            bIO->L.write(data / 100.0f);
         }
     }
+
+    UART::serialOut << UART::endl;
+}
+
+void setError(std::vector<std::string> args, Bot* bot) {
+    if(args.size() < 2) {
+        UART::serialOut << "ERROR: Not enough arguments" << UART::endl;
+        return;
+    }
+
+    float error = std::stof(args[1]);
+    bot->SetError(error);
+}
+
+void go_forward(std::vector<std::string> args, Bot* bot) {
+    if(args.size() < 2) {
+        UART::serialOut << "ERROR: Not enough arguments" << UART::endl;
+        return;
+    }
+
+    float speed = std::stof(args[1]);
+    bot->Forward(speed);
 }
 
 void autotest(std::vector<std::string> args, Bot* bot) {
@@ -62,4 +90,8 @@ void echo(std::vector<std::string> args, Bot* bot) {
 
 void monitor_state(std::vector<std::string> args, Bot* bot) {
     bot->ToggleMonitoring();
+}
+
+void showSensorState(std::vector<std::string> args, Bot* bot) {
+    bot->ShowSensorState();
 }

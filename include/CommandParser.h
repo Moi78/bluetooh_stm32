@@ -41,6 +41,8 @@ public:
 private:
     // This functions splits a string into a string array and uses spaces as splitter
     std::vector<std::string> ParseCommand(std::string cmd) {
+        UART::serialOut << "PARSE" << UART::endl;
+
         std::vector<std::string> args;
 
         std::string currentWord;

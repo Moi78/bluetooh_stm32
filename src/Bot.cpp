@@ -5,6 +5,8 @@ Bot::Bot() {
 
     m_bot_io = new BotIO;
 
+    m_error = 0.0f;
+
     // Setting PWM duty cycle
     m_bot_io->L.period(1.0f / 1000.0f);
     m_bot_io->R.period(1.0f / 1000.0f);
@@ -44,9 +46,10 @@ void Bot::MainRoutine() {
             break;
     }
 
-    if(m_monitor_enab && m_anti_spam.elapsed_time() > 2s) {
+    if(m_monitor_enab && m_anti_spam.elapsed_time() > 0.5s) {
         m_anti_spam.reset();
         PrintState();
+        ShowSensorState();
     }
 }
 
@@ -76,4 +79,36 @@ void Bot::ToggleMonitoring() {
     } else {
         UART::serialOut << "Monitoring disabled" << UART::endl;
     }
+}
+
+void Bot::SetError(float nError) {
+    m_error = nError;
+}
+
+float Bot::GetError() {
+    return m_error;
+}
+
+void Bot::UpdateCaptRead() {
+    BusOut busSelectMux(PA_8, PF_1, PF_0);
+    AnalogIn anaIn(PB_1);
+
+    for(int i = 0; i < 5; i++) {
+        busSelectMux = i;
+        wait_us(1);
+
+        m_capt_read[i] = anaIn.read();
+    } 
+}
+
+void Bot::ShowSensorState() {
+    for(auto& s : m_capt_read) {
+        UART::serialOut << std::to_string((int)(s * 100.0f)) << "% ";
+    }
+    UART::serialOut << UART::endl;
+}
+
+void Bot::Forward(float speed) {
+    m_bot_io->L.write(speed + (m_error / 100.0f));
+    m_bot_io->R.write(speed);
 }
