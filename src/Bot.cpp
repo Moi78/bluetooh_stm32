@@ -1,5 +1,7 @@
 #include "Bot.h"
 
+BusOut leds(PB_3, PA_7, PA_6, PA_5, PA_3, PA_1, PA_0, PA_2);
+
 Bot::Bot() {
     m_monitor_enab = false;
 
@@ -120,12 +122,16 @@ void Bot::UpdateCaptRead() {
     BusOut busSelectMux(PA_8, PF_1, PF_0);
     AnalogIn anaIn(PB_1);
 
+    uint8_t leds_data = 0;
     for(int i = 0; i < 5; i++) {
         busSelectMux = i;
         wait_us(1);
 
         m_capt_read[i] = anaIn.read();
+
+        leds_data |= (m_capt_read[i] < m_threashold) << i;
     } 
+    leds = leds_data;
 
     m_bot_io->BP = m_bot_io->dBP;
     m_bot_io->JACK = m_bot_io->dJACK;
@@ -233,11 +239,19 @@ void Bot::FollowRoutine() {
                 m_follow_future_state = turn_state::STRAIGHT;
             }
 
+            if(CG && (!CD)) {   //#define DERIVE_LEGER_GAUCHE CG && (!CD)
+                m_follow_future_state = turn_state_t::LITTLE_LEFT;
+            }
+
             break;
 
         case turn_state_t::BIG_RIGHT:
             if(CG && CD) {
                 m_follow_future_state = turn_state::STRAIGHT;
+            }
+
+            if(CD && (!CG)) {
+                m_follow_future_state = turn_state::LITTLE_RIGHT;
             }
 
             break;
