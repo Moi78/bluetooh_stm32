@@ -39,9 +39,9 @@ int main() {
     Bot bot = Bot();
     bot.InitBot();
     bot.SetError(-0.02);
-    bot.SetK(0.1f);
-    bot.SetSpeed(0.47);
-    bot.SetDiv(1.39);
+    bot.SetK(0.08f);
+    bot.SetSpeed(0.3);
+    bot.SetDiv(1.38);
 
     parser->SetUserPTR(&bot);
 
