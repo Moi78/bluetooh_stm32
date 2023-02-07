@@ -12,6 +12,9 @@ SerialPeriph pc(USBTX, USBRX, 9600);
 SerialPeriph rn42(D1, D0, 115000);
 
 int main() {
+    Timer samplingChrono;
+    samplingChrono.start();
+
     UART::serialOut.SetOutputPort(&rn42);
 
     // Setting up command parser for bluetooth com
@@ -24,16 +27,26 @@ int main() {
     parser->AddCommandCallback(&setError, "setError");
     parser->AddCommandCallback(&showSensorState, "showSensorState");
     parser->AddCommandCallback(&go_forward, "forward");
+    parser->AddCommandCallback(&bp, "bp");
+    parser->AddCommandCallback(&jack, "jack");
+    parser->AddCommandCallback(&setK, "setK");
+    parser->AddCommandCallback(&setDiv, "setDiv");
+    parser->AddCommandCallback(&setSpeed, "setSpeed");
+    parser->AddCommandCallback(&reset, "reset");
 
     // DEFAULT ERROR -3
 
     Bot bot = Bot();
     bot.InitBot();
-    bot.SetError(-3);
+    bot.SetError(-0.02);
+    bot.SetK(0.1f);
+    bot.SetSpeed(0.47);
+    bot.SetDiv(1.39);
 
     parser->SetUserPTR(&bot);
 
     while(1) {
+        #if !RACE_MODE
         // Updating serial I/O
         pc.Poll();
         rn42.Poll();
@@ -46,6 +59,7 @@ int main() {
                 UART::serialOut << "ERROR: Unknown command." << UART::endl;
             }
         }
+        #endif // RACE_MODE
 
         // Bot update
         bot.UpdateCaptRead();

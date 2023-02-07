@@ -95,3 +95,52 @@ void monitor_state(std::vector<std::string> args, Bot* bot) {
 void showSensorState(std::vector<std::string> args, Bot* bot) {
     bot->ShowSensorState();
 }
+
+void bp(std::vector<std::string> args, Bot* bot) {
+    auto* io = bot->GetIO();
+    io->BP = !io->BP;
+
+    UART::serialOut << std::to_string(io->BP) << UART::endl;
+}
+
+void jack(std::vector<std::string> args, Bot* bot) {
+    auto* io = bot->GetIO();
+    io->JACK = !io->JACK;
+
+    UART::serialOut << std::to_string(io->JACK) << UART::endl;
+}
+
+void setK(std::vector<std::string> args, Bot* bot) {
+    if(args.size() < 2) {
+        UART::serialOut << "ERROR: Not enough arguments." << UART::endl;
+        return;
+    }
+
+    float data = std::stof(args[1]);
+    bot->SetK(data);
+}
+
+void setDiv(std::vector<std::string> args, Bot* bot) {
+    if(args.size() < 2) {
+        UART::serialOut << "ERROR: Not enough arguments." << UART::endl;
+        return;
+    }
+
+    float data = std::stof(args[1]);
+    bot->SetDiv(data);
+}
+
+void setSpeed(std::vector<std::string> args, Bot* bot) {
+    if(args.size() < 2) {
+        UART::serialOut << "ERROR: Not enough arguments." << UART::endl;
+        return;
+    }
+
+    float data = std::stof(args[1]);
+    bot->SetSpeed(data);
+}
+
+void reset(std::vector<std::string> args, Bot* bot) {
+    bot->GetIO()->BP = false;
+    bot->GetIO()->JACK = true;
+}
