@@ -18,8 +18,8 @@ Bot::Bot() {
     m_follow_tempo.start();
 
     // Setting PWM duty cycle
-    m_bot_io->L.period(1.0f / 1000.0f);
-    m_bot_io->R.period(1.0f / 1000.0f);
+    m_bot_io->L.period(1.0f / 15000.0f);
+    m_bot_io->R.period(1.0f / 15000.0f);
 }
 
 Bot::~Bot() {
@@ -42,13 +42,16 @@ void Bot::MainRoutine() {
                 m_current_state = main_states_t::RUN;
 
                 Forward(m_speed);
+                m_lap_time.start();
             }
 
             break;
         case main_states_t::RUN: 
             if(BP) {
                 m_current_state = main_states_t::STOP;
-                UART::serialOut << "BP PRESSED" << UART::endl;
+
+                m_lap_time.stop();
+                UART::serialOut << "Lap time : " << std::to_string((int)m_lap_time.read()) << UART::endl;
                 break;
             }
 
@@ -174,6 +177,15 @@ void Bot::FollowRoutine() {
 
     bool CR = m_capt_read[0] <= threshold;
 
+
+    if(CD && CG && CED && CEG) {
+        UART::serialOut << "CROISEMENT" << UART::endl;
+        return;
+    } else if(CR && CEG && (!CD) && (!CED)) {
+        UART::serialOut << "RACCOURCIS" << UART::endl;
+        return;
+    }
+
     m_follow_current_state = m_follow_future_state;
     switch (m_follow_current_state)
     {
@@ -260,7 +272,7 @@ void Bot::FollowRoutine() {
     switch(m_follow_current_state)
     {
         case turn_state_t::STRAIGHT:
-            Forward(m_speed);
+            Forward(m_speed + 0.15f);
             break;
 
         case turn_state_t::LITTLE_LEFT:

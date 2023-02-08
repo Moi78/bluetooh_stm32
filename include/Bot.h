@@ -87,6 +87,7 @@ private:
     Timer m_anti_spam;
     
     Timer m_follow_tempo;
+    Timer m_lap_time;
 
     float m_error;
     float m_k;

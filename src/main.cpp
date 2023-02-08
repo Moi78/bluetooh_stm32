@@ -40,8 +40,8 @@ int main() {
     bot.InitBot();
     bot.SetError(-0.02);
     bot.SetK(0.08f);
-    bot.SetSpeed(0.3);
-    bot.SetDiv(1.38);
+    bot.SetSpeed(0.5);
+    bot.SetDiv(1.42);
 
     parser->SetUserPTR(&bot);
 
