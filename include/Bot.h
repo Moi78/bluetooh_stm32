@@ -130,7 +130,7 @@ private:
     float m_slow_fact;
 
     std::array<float, 5> m_capt_read;
-    std::array<float, 5> m_capt_acq;
+    std::array<Timer, 5> m_capt_stamp;
     
     uint64_t m_acq_count;
     int m_persistance_amount;

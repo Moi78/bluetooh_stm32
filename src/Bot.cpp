@@ -16,13 +16,17 @@ Bot::Bot() {
     m_speed_fac = 1.0f;
     m_sht_count = 0;
     
-    m_persistance_amount = 5;
+    m_persistance_amount = 200;
 
     m_base_threashold = 0.20;
     m_threashold = m_base_threashold;
 
     m_follow_tempo.start();
     m_shortcut_reset.start();
+
+    for(int i = 0; i < 5; i++) {
+        m_capt_stamp[i].start();
+    }
 
     // Setting PWM duty cycle
     m_bot_io->L.period(1.0f / 15000.0f);
@@ -48,8 +52,8 @@ void Bot::MainRoutine() {
     bool JACK = m_bot_io->JACK;
 
     if(m_sht_count == 1) {
-        m_speed_fac = 0.73f;
-    } else {
+        m_speed_fac = 0.78f;
+    } else if((m_shortcut_state != shortcut_state_t::SEEN1) || (m_sht_count > 1)) {
         m_speed_fac = 1.0f;
     }
 
@@ -150,7 +154,14 @@ void Bot::PrintState() {
         {turn_state_t::MEGA_RIGHT, "MEGA RIGHT"}
     };
 
-    UART::serialOut << stringify[m_current_state] << " " << stringify_turn[m_follow_current_state] << UART::endl;
+    std::unordered_map<shortcut_state_t, std::string> stringify_shortcut {
+        {shortcut_state_t::SHT_INIT, "SHT INIT"},
+        {shortcut_state_t::SEEN1, "SEEN1"},
+        {shortcut_state_t::SEEN2, "SEEN2"},
+        {shortcut_state_t::BLACKOUT, "BLACKOUT"}
+    };
+
+    UART::serialOut << stringify[m_current_state] << " " << stringify_turn[m_follow_current_state] << " " << stringify_shortcut[m_shortcut_state] << UART::endl;
 }
 
 void Bot::ToggleMonitoring() {
@@ -180,22 +191,21 @@ void Bot::UpdateCaptRead() {
         busSelectMux = i;
         wait_us(1);
 
-        m_capt_acq[i] += anaIn.read();
-    } 
-    m_acq_count++;
-
-    if(m_persistance_timer.read_ms() > m_persistance_amount) {
-        for(int i = 0; i < 5; i++) {
-            m_capt_read[i] = m_capt_acq[i] / m_acq_count;
-            m_capt_acq[i] = 0;
-
-            leds_data |= (m_capt_read[i] < m_threashold) << i;
+        if(i == 0) {
+            if(m_capt_read[i] > m_base_threashold) {
+                m_capt_read[i] = anaIn.read();
+                m_capt_stamp[i].reset();
+            } else if((m_capt_stamp[i].read_ms() >= m_persistance_amount)) {
+                m_capt_read[i] = anaIn.read();
+                m_capt_stamp[i].reset();
+            }
+        } else {
+            m_capt_read[i] = anaIn.read();
         }
 
-        m_persistance_timer.reset();
-        m_acq_count = 0;
-        leds = leds_data;
+        leds_data |= (m_capt_read[i] <= m_base_threashold) << i;
     }
+    leds = leds_data;
 
     m_bot_io->BP = m_bot_io->dBP;
     m_bot_io->JACK = m_bot_io->dJACK;
@@ -359,49 +369,42 @@ void Bot::FollowRoutine() {
     {
         case turn_state_t::STRAIGHT:
             Forward(fspeed + 0.18f);
-            m_persistance_amount = 50;
             break;
 
         case turn_state_t::LITTLE_LEFT:
             SetLeft(fspeed / m_error);
             SetRight(fspeed * m_error);
-            m_persistance_amount = 30;
             break;
 
         case turn_state_t::LITTLE_RIGHT:
             SetLeft(fspeed * 1.059f);
             SetRight(fspeed / 1.059f);
-            m_persistance_amount = 30;
             break;
 
         case turn_state_t::BIG_LEFT:
             SetLeft(fspeed / m_div);
             SetRight(fspeed * m_div);
-            m_persistance_amount = 10;
             break;
 
         case turn_state_t::BIG_RIGHT:
             SetLeft(fspeed * m_div);
             SetRight(fspeed / m_div);
-            m_persistance_amount = 10;
             break;
 
         case turn_state_t::MEGA_LEFT:
             SetLeft(fspeed / m_mega_div);
             SetRight(fspeed * m_mega_div);
-            m_persistance_amount = 5;
             break;
 
         case turn_state_t::MEGA_RIGHT:
             SetLeft(fspeed * m_mega_div);
             SetRight(fspeed / m_mega_div);
-            m_persistance_amount = 5;
             break;
     }
 }
 
 void Bot::ShortcutDetectionUpdate() {
-    if(m_shortcut_reset.read() > 1.0f) {
+    if(m_shortcut_reset.read() > 1.8f) {
         m_shortcut_state = shortcut_state_t::SHT_INIT;
         m_shortcut_reset.reset();
     }
@@ -409,8 +412,13 @@ void Bot::ShortcutDetectionUpdate() {
     bool CEG = m_capt_read[1] <= m_base_threashold;
     bool CR = m_capt_read[0] <= m_base_threashold;
     bool CG = m_capt_read[2] <= m_base_threashold; // Is white ?
+    bool CD = m_capt_read[3] <= m_base_threashold; // Is white ?
 
     bool CED = m_capt_read[4] <= m_base_threashold;
+
+    if(CED && CG && CD && CEG && (m_sht_count != 1)) {
+        return;
+    }
 
     switch(m_shortcut_state) {
         case shortcut_state_t::SHT_INIT:
@@ -418,12 +426,16 @@ void Bot::ShortcutDetectionUpdate() {
                 m_shortcut_state = shortcut_state_t::SEEN1;
             }
 
+            m_speed_fac = 1;
+
             break;
 
         case shortcut_state_t::SEEN1:
-            if(!CEG && !CR && !CG) {
+            if(!CEG && !CG && !CR) {
                 m_shortcut_state = shortcut_state_t::BLACKOUT;
             }
+
+            m_speed_fac = 0.6f;
 
             break;
 
