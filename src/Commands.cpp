@@ -144,3 +144,13 @@ void reset(std::vector<std::string> args, Bot* bot) {
     bot->GetIO()->BP = false;
     bot->GetIO()->JACK = true;
 }
+
+void setMegaDiv(std::vector<std::string> args, Bot* bot) {
+    if(args.size() < 2) {
+        UART::serialOut << "ERROR: Not enough arguments." << UART::endl;
+        return;
+    }
+
+    float data = std::stof(args[1]);
+    bot->SetMegaDiv(data);
+}

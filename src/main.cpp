@@ -33,15 +33,18 @@ int main() {
     parser->AddCommandCallback(&setDiv, "setDiv");
     parser->AddCommandCallback(&setSpeed, "setSpeed");
     parser->AddCommandCallback(&reset, "reset");
+    parser->AddCommandCallback(&setMegaDiv, "setMegaDiv");
 
     // DEFAULT ERROR -3
 
     Bot bot = Bot();
     bot.InitBot();
-    bot.SetError(-0.02);
-    bot.SetK(0.08f);
-    bot.SetSpeed(0.5);
-    bot.SetDiv(1.42);
+    bot.SetK(0.008f);
+    bot.SetSpeed(0.32f);
+
+    bot.SetError(1.02f);
+    bot.SetDiv(1.17f);
+    bot.SetMegaDiv(1.48f);
 
     parser->SetUserPTR(&bot);
 
@@ -63,6 +66,7 @@ int main() {
 
         // Bot update
         bot.UpdateCaptRead();
+        bot.ShortcutDetectionUpdate();
         bot.MainRoutine();
     }
 }

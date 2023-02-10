@@ -7,6 +7,6 @@
 #define VERSION(x, y, z) ((x << 16) + ((uint8_t)y << 8) + z)
 #define BUILD_DATE std::string(__DATE__)
 
-#define FIRM_VER VERSION(1, 0, 0)
+#define FIRM_VER VERSION(2, 1, 0)
 
 #endif // DEFS_H__
