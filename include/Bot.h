@@ -130,6 +130,12 @@ private:
     float m_slow_fact;
 
     std::array<float, 5> m_capt_read;
+    std::array<float, 5> m_capt_acq;
+    
+    uint64_t m_acq_count;
+    int m_persistance_amount;
+
+    Timer m_persistance_timer;
 };
 
 #endif //BOT_H__

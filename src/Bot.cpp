@@ -15,6 +15,8 @@ Bot::Bot() {
 
     m_speed_fac = 1.0f;
     m_sht_count = 0;
+    
+    m_persistance_amount = 5;
 
     m_base_threashold = 0.20;
     m_threashold = m_base_threashold;
@@ -38,6 +40,7 @@ void Bot::InitBot() {
     m_shortcut_routine_state_c = shortcut_routine_state_t::SHTR_INIT;
 
     m_anti_spam.start();
+    m_persistance_timer.start();
 }
 
 void Bot::MainRoutine() {
@@ -177,11 +180,22 @@ void Bot::UpdateCaptRead() {
         busSelectMux = i;
         wait_us(1);
 
-        m_capt_read[i] = anaIn.read();
-
-        leds_data |= (m_capt_read[i] < m_threashold) << i;
+        m_capt_acq[i] += anaIn.read();
     } 
-    leds = leds_data;
+    m_acq_count++;
+
+    if(m_persistance_timer.read_ms() > m_persistance_amount) {
+        for(int i = 0; i < 5; i++) {
+            m_capt_read[i] = m_capt_acq[i] / m_acq_count;
+            m_capt_acq[i] = 0;
+
+            leds_data |= (m_capt_read[i] < m_threashold) << i;
+        }
+
+        m_persistance_timer.reset();
+        m_acq_count = 0;
+        leds = leds_data;
+    }
 
     m_bot_io->BP = m_bot_io->dBP;
     m_bot_io->JACK = m_bot_io->dJACK;
@@ -345,36 +359,43 @@ void Bot::FollowRoutine() {
     {
         case turn_state_t::STRAIGHT:
             Forward(fspeed + 0.18f);
+            m_persistance_amount = 50;
             break;
 
         case turn_state_t::LITTLE_LEFT:
             SetLeft(fspeed / m_error);
             SetRight(fspeed * m_error);
+            m_persistance_amount = 30;
             break;
 
         case turn_state_t::LITTLE_RIGHT:
             SetLeft(fspeed * 1.059f);
             SetRight(fspeed / 1.059f);
+            m_persistance_amount = 30;
             break;
 
         case turn_state_t::BIG_LEFT:
             SetLeft(fspeed / m_div);
             SetRight(fspeed * m_div);
+            m_persistance_amount = 10;
             break;
 
         case turn_state_t::BIG_RIGHT:
             SetLeft(fspeed * m_div);
             SetRight(fspeed / m_div);
+            m_persistance_amount = 10;
             break;
 
         case turn_state_t::MEGA_LEFT:
             SetLeft(fspeed / m_mega_div);
             SetRight(fspeed * m_mega_div);
+            m_persistance_amount = 5;
             break;
 
         case turn_state_t::MEGA_RIGHT:
             SetLeft(fspeed * m_mega_div);
             SetRight(fspeed / m_mega_div);
+            m_persistance_amount = 5;
             break;
     }
 }
