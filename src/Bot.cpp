@@ -11,11 +11,18 @@ Bot::Bot() {
     m_k = 0.001f;
     m_div = 1800.0f;
     m_speed = 0.25f;
+    m_slow_fact = 0.0f;
+
+    m_speed_fac = 1.0f;
+    m_sht_count = 0;
+    
+    m_persistance_amount = 5;
 
     m_base_threashold = 0.20;
     m_threashold = m_base_threashold;
 
     m_follow_tempo.start();
+    m_shortcut_reset.start();
 
     // Setting PWM duty cycle
     m_bot_io->L.period(1.0f / 15000.0f);
@@ -29,12 +36,22 @@ Bot::~Bot() {
 void Bot::InitBot() {
     m_current_state = main_states_t::INIT;
     m_follow_current_state = turn_state_t::STRAIGHT;
+    m_shortcut_state = shortcut_state_t::SHT_INIT;
+    m_shortcut_routine_state_c = shortcut_routine_state_t::SHTR_INIT;
+
     m_anti_spam.start();
+    m_persistance_timer.start();
 }
 
 void Bot::MainRoutine() {
     bool BP = m_bot_io->BP;
     bool JACK = m_bot_io->JACK;
+
+    if(m_sht_count == 1) {
+        m_speed_fac = 0.73f;
+    } else {
+        m_speed_fac = 1.0f;
+    }
 
     switch(m_current_state) {
         case main_states_t::INIT:
@@ -52,6 +69,18 @@ void Bot::MainRoutine() {
 
                 m_lap_time.stop();
                 UART::serialOut << "Lap time : " << std::to_string((int)m_lap_time.read()) << UART::endl;
+                m_lap_time.reset();
+
+                break;
+            }
+
+            if((m_shortcut_state == shortcut_state_t::SEEN2) && (m_sht_count < 2)) {
+                m_current_state = main_states_t::SHRTCUT;
+                m_shortcut_routine_state_f = shortcut_routine_state_t::SHTR_INIT;
+                m_shortcut_state = shortcut_state_t::SHT_INIT;
+
+                UART::serialOut << "SHORTCUT" << UART::endl;
+
                 break;
             }
 
@@ -65,6 +94,24 @@ void Bot::MainRoutine() {
             }
 
             Stop();
+
+            m_sht_count = 0;
+            m_speed_fac = 1.0f;
+
+            break;
+
+        case main_states_t::SHRTCUT:
+            if(BP) {
+                m_current_state = main_states_t::STOP;
+
+                m_lap_time.stop();
+                UART::serialOut << "Lap time : " << std::to_string((int)m_lap_time.read()) << UART::endl;
+                m_lap_time.reset();
+
+                break;
+            }
+
+            ShortcutRoutine();
 
             break;
     }
@@ -89,7 +136,8 @@ void Bot::PrintState() {
     std::unordered_map<main_states_t, std::string> stringify {
         {main_states_t::INIT, "INIT"},
         {main_states_t::RUN, "RUN"},
-        {main_states_t::STOP, "STOP"}
+        {main_states_t::STOP, "STOP"},
+        {main_states_t::SHRTCUT, "SHORTCUT"}
     };
 
     std::unordered_map<turn_state_t, std::string> stringify_turn {
@@ -97,7 +145,9 @@ void Bot::PrintState() {
         {turn_state_t::LITTLE_RIGHT, "LITTLE RIGHT"},
         {turn_state_t::STRAIGHT, "STAIGHT"},
         {turn_state_t::BIG_LEFT, "BIG LEFT"},
-        {turn_state_t::BIG_RIGHT, "BIG RIGHT"}
+        {turn_state_t::BIG_RIGHT, "BIG RIGHT"},
+        {turn_state_t::MEGA_LEFT, "MEGA LEFT"},
+        {turn_state_t::MEGA_RIGHT, "MEGA RIGHT"}
     };
 
     UART::serialOut << stringify[m_current_state] << " " << stringify_turn[m_follow_current_state] << UART::endl;
@@ -130,11 +180,22 @@ void Bot::UpdateCaptRead() {
         busSelectMux = i;
         wait_us(1);
 
-        m_capt_read[i] = anaIn.read();
-
-        leds_data |= (m_capt_read[i] < m_threashold) << i;
+        m_capt_acq[i] += anaIn.read();
     } 
-    leds = leds_data;
+    m_acq_count++;
+
+    if(m_persistance_timer.read_ms() > m_persistance_amount) {
+        for(int i = 0; i < 5; i++) {
+            m_capt_read[i] = m_capt_acq[i] / m_acq_count;
+            m_capt_acq[i] = 0;
+
+            leds_data |= (m_capt_read[i] < m_threashold) << i;
+        }
+
+        m_persistance_timer.reset();
+        m_acq_count = 0;
+        leds = leds_data;
+    }
 
     m_bot_io->BP = m_bot_io->dBP;
     m_bot_io->JACK = m_bot_io->dJACK;
@@ -153,11 +214,11 @@ void Bot::ShowSensorState() {
 
     UART::serialOut << UART::endl << "Jack: " << std::to_string(m_bot_io->JACK) << " BP: " << std::to_string(m_bot_io->BP) << UART::endl;
     UART::serialOut << "PWM L: " << std::to_string((int)(m_bot_io->L.read() * 100.0f)) << " PWM R: " << std::to_string((int)(m_bot_io->R.read() * 100.0f)) << UART::endl;
-    UART::serialOut << "Contrast : " << std::to_string((int)(fabs(m_capt_read[3] - m_capt_read[2]) * 100.0f)) << UART::endl;
+    UART::serialOut << "Sht Count : " << std::to_string(m_sht_count) << UART::endl;
 }
 
 void Bot::Forward(float speed) {
-    m_bot_io->L.write(speed + (m_error));
+    m_bot_io->L.write(speed - 0.02);
     m_bot_io->R.write(speed);
 }
 
@@ -177,12 +238,13 @@ void Bot::FollowRoutine() {
 
     bool CR = m_capt_read[0] <= threshold;
 
-
-    if(CD && CG && CED && CEG) {
-        UART::serialOut << "CROISEMENT" << UART::endl;
+    if(m_current_state == main_states_t::SHRTCUT) {
         return;
-    } else if(CR && CEG && (!CD) && (!CED)) {
-        UART::serialOut << "RACCOURCIS" << UART::endl;
+    }
+
+    if(CED && CEG) {
+        return;
+    } else if(CR && CEG) {
         return;
     }
 
@@ -190,109 +252,246 @@ void Bot::FollowRoutine() {
     switch (m_follow_current_state)
     {
         case turn_state_t::STRAIGHT:
-            if(CG && (!CD)) {   //#define DERIVE_LEGER_GAUCHE CG && (!CD)
+            if(CG && (!CD)) {
+                m_follow_future_state = turn_state_t::LITTLE_RIGHT;
+            }
+
+            if(CG && (!CD)) {
                 m_follow_future_state = turn_state_t::LITTLE_LEFT;
             }
 
             if(CD && (!CG)) {
-                m_follow_future_state = turn_state::LITTLE_RIGHT;
-            }
-
-            if(CED) {
-                m_follow_future_state = turn_state_t::BIG_RIGHT;
-            }
-
-            if(CEG) {
-                m_follow_future_state = turn_state_t::BIG_LEFT;
+                m_follow_future_state = turn_state_t::LITTLE_RIGHT;
             }
 
             break;
 
         case turn_state_t::LITTLE_LEFT:
-            if(CG && CD) {
+            if(CD && CG) {
                 m_follow_future_state = turn_state_t::STRAIGHT;
             }
 
-            if(CD && (!CG)) {
-                m_follow_future_state = turn_state::LITTLE_RIGHT;
-            }
-
-            if(CED) {
-                m_follow_future_state = turn_state_t::BIG_RIGHT;
-            }
-
-            if(CEG) {
+            if(CEG && CG) {
                 m_follow_future_state = turn_state_t::BIG_LEFT;
+            } else if(CEG) {
+                m_follow_future_state = turn_state_t::MEGA_LEFT;
             }
 
             break;
 
         case turn_state_t::LITTLE_RIGHT:
-            if(CG && CD) {
-                m_follow_future_state = turn_state::STRAIGHT;
+            if(CD && CG) {
+                m_follow_future_state = turn_state_t::STRAIGHT;
             }
 
-            if(CG && (!CD)) {   //#define DERIVE_LEGER_GAUCHE CG && (!CD)
-                m_follow_future_state = turn_state_t::LITTLE_LEFT;
-            }
-
-            if(CED) {
+            if(CED && CD) {
                 m_follow_future_state = turn_state_t::BIG_RIGHT;
-            }
-
-            if(CEG) {
-                m_follow_future_state = turn_state_t::BIG_LEFT;
+            } else if(CED) {
+                m_follow_future_state = turn_state_t::MEGA_RIGHT;
             }
 
             break;
 
         case turn_state_t::BIG_LEFT:
-            if(CG && CD) {
-                m_follow_future_state = turn_state::STRAIGHT;
+            if(CD && CG) {
+                m_follow_future_state = turn_state_t::STRAIGHT;
             }
 
-            if(CG && (!CD)) {   //#define DERIVE_LEGER_GAUCHE CG && (!CD)
-                m_follow_future_state = turn_state_t::LITTLE_LEFT;
+            if(CEG) {
+                m_follow_future_state = turn_state_t::MEGA_LEFT;
             }
 
             break;
 
         case turn_state_t::BIG_RIGHT:
-            if(CG && CD) {
-                m_follow_future_state = turn_state::STRAIGHT;
+            if(CD && CG) {
+                m_follow_future_state = turn_state_t::STRAIGHT;
+            }
+
+            if(CED) {
+                m_follow_future_state = turn_state_t::MEGA_RIGHT;
+            }
+
+            break;
+
+        case turn_state_t::MEGA_LEFT:
+            if(CD && CG) {
+                m_follow_future_state = turn_state_t::STRAIGHT;
+            }
+
+            if(CEG && CG) {
+                m_follow_future_state = turn_state_t::BIG_LEFT;
+            }
+
+            if(CG && (!CD)) {
+                m_follow_future_state = turn_state_t::LITTLE_LEFT;
             }
 
             if(CD && (!CG)) {
-                m_follow_future_state = turn_state::LITTLE_RIGHT;
+                m_follow_future_state = turn_state_t::LITTLE_RIGHT;
+            }
+
+            break;
+
+        case turn_state_t::MEGA_RIGHT:
+            if(CD && CG) {
+                m_follow_future_state = turn_state_t::STRAIGHT;
+            }
+
+            if(CED && CD) {
+                m_follow_future_state = turn_state_t::BIG_RIGHT;
+            }
+
+            if(CG && (!CD)) {
+                m_follow_future_state = turn_state_t::LITTLE_LEFT;
+            }
+
+            if(CD && (!CG)) {
+                m_follow_future_state = turn_state_t::LITTLE_RIGHT;
             }
 
             break;
     }
 
+    float fspeed = m_speed_fac * m_speed;
+
     switch(m_follow_current_state)
     {
         case turn_state_t::STRAIGHT:
-            Forward(m_speed + 0.15f);
+            Forward(fspeed + 0.18f);
+            m_persistance_amount = 50;
             break;
 
         case turn_state_t::LITTLE_LEFT:
-            SetLeft(m_speed + m_error - m_k);
-            SetRight((m_speed + (m_k / 3)));
+            SetLeft(fspeed / m_error);
+            SetRight(fspeed * m_error);
+            m_persistance_amount = 30;
             break;
 
         case turn_state_t::LITTLE_RIGHT:
-            SetLeft(m_speed + m_error + (m_k / 3));
-            SetRight(m_speed - m_k);
+            SetLeft(fspeed * 1.059f);
+            SetRight(fspeed / 1.059f);
+            m_persistance_amount = 30;
             break;
 
         case turn_state_t::BIG_LEFT:
-            SetLeft(m_speed / m_div);
-            SetRight(m_speed * m_div);
+            SetLeft(fspeed / m_div);
+            SetRight(fspeed * m_div);
+            m_persistance_amount = 10;
             break;
 
         case turn_state_t::BIG_RIGHT:
-            SetLeft(m_speed * m_div);
-            SetRight(m_speed / m_div);
+            SetLeft(fspeed * m_div);
+            SetRight(fspeed / m_div);
+            m_persistance_amount = 10;
+            break;
+
+        case turn_state_t::MEGA_LEFT:
+            SetLeft(fspeed / m_mega_div);
+            SetRight(fspeed * m_mega_div);
+            m_persistance_amount = 5;
+            break;
+
+        case turn_state_t::MEGA_RIGHT:
+            SetLeft(fspeed * m_mega_div);
+            SetRight(fspeed / m_mega_div);
+            m_persistance_amount = 5;
+            break;
+    }
+}
+
+void Bot::ShortcutDetectionUpdate() {
+    if(m_shortcut_reset.read() > 1.0f) {
+        m_shortcut_state = shortcut_state_t::SHT_INIT;
+        m_shortcut_reset.reset();
+    }
+
+    bool CEG = m_capt_read[1] <= m_base_threashold;
+    bool CR = m_capt_read[0] <= m_base_threashold;
+    bool CG = m_capt_read[2] <= m_base_threashold; // Is white ?
+
+    bool CED = m_capt_read[4] <= m_base_threashold;
+
+    switch(m_shortcut_state) {
+        case shortcut_state_t::SHT_INIT:
+            if(CEG && CR && CG) {
+                m_shortcut_state = shortcut_state_t::SEEN1;
+            }
+
+            break;
+
+        case shortcut_state_t::SEEN1:
+            if(!CEG && !CR && !CG) {
+                m_shortcut_state = shortcut_state_t::BLACKOUT;
+            }
+
+            break;
+
+        case shortcut_state_t::BLACKOUT:
+            if(CEG && CR && CG) {
+                m_shortcut_state = shortcut_state_t::SEEN2;
+            }
+
+            break;
+
+        case shortcut_state_t::SEEN2:
+            if(!CR && !CG) {
+                m_shortcut_state = shortcut_state_t::SHT_INIT;
+            }
+
+            break;
+    }
+}
+
+void Bot::ShortcutRoutine() {
+    bool CD = m_capt_read[3] <= m_base_threashold; // Is white ?
+    bool CG = m_capt_read[2] <= m_base_threashold; // Is white ?
+
+    m_shortcut_routine_state_c = m_shortcut_routine_state_f;
+    switch(m_shortcut_routine_state_c) {
+        case shortcut_routine_state_t::SHTR_INIT:
+            if(!CD && !CG) {
+                m_shortcut_routine_state_f = shortcut_routine_state_t::LEAVE;
+                m_sht_count++;
+            }
+
+            break;
+
+        case shortcut_routine_state_t::LEAVE:
+            if(CD && CG) {
+                m_shortcut_routine_state_f = shortcut_routine_state_t::GOT;
+            }
+
+            break;
+
+        case shortcut_routine_state_t::GOT:
+            m_current_state = main_states_t::RUN;
+            m_shortcut_routine_state_f = shortcut_routine_state_t::SHTR_INIT;
+            m_shortcut_state = shortcut_state_t::SHT_INIT;
+
+            break;
+
+        case shortcut_routine_state_t::FORWARD:
+            break;
+    }
+
+    switch(m_shortcut_routine_state_c) {
+        case shortcut_routine_state_t::SHTR_INIT:
+            SetLeft(0);
+            SetRight(0.28);
+
+            break;
+
+        case shortcut_routine_state_t::LEAVE:
+            SetLeft(0);
+            SetRight(0.28);
+
+            break;
+
+        case shortcut_routine_state_t::GOT:
+            break;
+
+        case shortcut_routine_state_t::FORWARD:
             break;
     }
 }
@@ -327,4 +526,8 @@ void Bot::SetLeft(float speed) {
 
 void Bot::SetRight(float speed) {
     m_bot_io->R.write(speed);
+}
+
+void Bot::SetMegaDiv(float nMegaDiv) {
+    m_mega_div = nMegaDiv;
 }

@@ -16,6 +16,8 @@
 void setK(std::vector<std::string> args, Bot* bot);
 void setDiv(std::vector<std::string> args, Bot* bot);
 void setError(std::vector<std::string> args, Bot* bot);
+void setMegaDiv(std::vector<std::string> args, Bot* bot);
+
 void setPwm(std::vector<std::string> args, Bot* bot);
 void autotest(std::vector<std::string> args, Bot* bot);
 void go_forward(std::vector<std::string> args, Bot* bot);
