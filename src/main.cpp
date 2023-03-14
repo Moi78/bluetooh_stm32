@@ -42,7 +42,7 @@ int main() {
     bot.SetK(0.008f);
     bot.SetSpeed(0.32f);
 
-    bot.SetError(1.02f);
+    bot.SetError(1.01f);
     bot.SetDiv(1.17f);
     bot.SetMegaDiv(1.48f);
 

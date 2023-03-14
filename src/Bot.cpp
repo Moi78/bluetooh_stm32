@@ -18,7 +18,7 @@ Bot::Bot() {
     
     m_persistance_amount = 200;
 
-    m_base_threashold = 0.20;
+    m_base_threashold = 0.15;
     m_threashold = m_base_threashold;
 
     m_follow_tempo.start();
@@ -246,7 +246,7 @@ void Bot::FollowRoutine() {
     bool CED = m_capt_read[4] <= threshold;
     bool CEG = m_capt_read[1] <= threshold;
 
-    bool CR = m_capt_read[0] <= threshold;
+    bool CR = m_capt_read[0] <= (m_base_threashold);
 
     if(m_current_state == main_states_t::SHRTCUT) {
         return;
@@ -363,12 +363,12 @@ void Bot::FollowRoutine() {
             break;
     }
 
-    float fspeed = m_speed_fac * m_speed;
+    float fspeed = 1 * m_speed;
 
     switch(m_follow_current_state)
     {
         case turn_state_t::STRAIGHT:
-            Forward(fspeed + 0.18f);
+            Forward(fspeed + 0.12f);
             break;
 
         case turn_state_t::LITTLE_LEFT:
@@ -404,13 +404,13 @@ void Bot::FollowRoutine() {
 }
 
 void Bot::ShortcutDetectionUpdate() {
-    if(m_shortcut_reset.read() > 1.8f) {
+    if(m_shortcut_reset.read() > 2.0f) {
         m_shortcut_state = shortcut_state_t::SHT_INIT;
         m_shortcut_reset.reset();
     }
 
     bool CEG = m_capt_read[1] <= m_base_threashold;
-    bool CR = m_capt_read[0] <= m_base_threashold;
+    bool CR = m_capt_read[0] <= (m_base_threashold);
     bool CG = m_capt_read[2] <= m_base_threashold; // Is white ?
     bool CD = m_capt_read[3] <= m_base_threashold; // Is white ?
 
@@ -426,7 +426,7 @@ void Bot::ShortcutDetectionUpdate() {
                 m_shortcut_state = shortcut_state_t::SEEN1;
             }
 
-            m_speed_fac = 1;
+            m_speed_fac = 0.6;
 
             break;
 
